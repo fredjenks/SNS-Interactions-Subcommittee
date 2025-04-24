@@ -1,0 +1,48 @@
+digraph POSIXtoS3 {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    subgraph clusterState {
+            CheckACL
+            CheckMetadata
+            Coordination
+            AcquireLock
+    }
+
+    // POSIX Actions
+    UserOps [label="User Operation:\n- Create directory\n- Create file\n- Read/Edit file", shape=box, style="filled", fillcolor="#e0c7f7"];
+
+    // ACL Check
+    CheckACL [label="Check ACLs", shape=diamond];
+    ACLDenied [label="Access Denied", shape=ellipse, style=filled, fillcolor="#fbb"];
+
+    // Interactions Layer
+    InteractionsLayer [label="Interactions Layer", shape=box, style="filled", fillcolor="#cfe2f3"];
+
+    // Metadata Check
+    CheckMetadata [label="Check Metadata", shape=diamond];
+    StoreMetadata [label="Store Metadata in Metadata Store", shape=parallelogram, style=filled, fillcolor="#ffffcc"];
+
+    // Coordination
+    Coordination [label="Send message to Coordination Service", shape=box];
+    AcquireLock [label="Acquire Lock", shape=diamond];
+    LockDenied [label="Access Denied", shape=ellipse, style=filled, fillcolor="#fbb"];
+
+    // Perform Operation
+    PerformOp [label="Perform Operation (PUT, GET, DELETE, etc.)", shape=box, style="filled", fillcolor="#cfe2f3"];
+
+    // S3 Backend
+    S3 [label="Object Store", shape=cylinder, style=filled, fillcolor="#d5f4e6"];
+
+    // Edges
+    UserOps -> CheckACL;
+    CheckACL -> ACLDenied [label="No"];
+    CheckACL -> InteractionsLayer [label="Yes"];
+    InteractionsLayer -> CheckMetadata;
+    CheckMetadata -> StoreMetadata [label="No"];
+    StoreMetadata -> Coordination;
+    CheckMetadata -> Coordination [label="Yes"];
+    Coordination -> AcquireLock;
+    AcquireLock -> LockDenied [label="No"];
+    AcquireLock -> PerformOp [label="Yes"];
+    PerformOp -> S3;
+}

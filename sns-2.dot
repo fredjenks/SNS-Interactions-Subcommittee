@@ -1,0 +1,86 @@
+digraph POSIXtoS3 {
+    rankdir=LR;
+    node [shape=box, style=rounded];
+
+    // POSIX Categories (Left)
+    subgraph cluster_posix {
+        label="POSIX Operations";
+        style=dashed;
+
+        posix_open [label="OPEN:\n- FILEOPEN"];
+        posix_create_open [label="CREATE_OPEN:\n- ATOMIC_FILEOPEN"];
+        posix_create [label="CREATE:\n- SYMLINK\n- LINK\n- MKNOD"];
+        posix_read [label="READ:\n- GETATTR\n- LOOKUP\n- READDIR\n- GETXATTR\n- LISTXATTR"];
+        posix_modify [label="MODIFY:\n- SETATTR\n- SETXATTR\n- RMXATTR"];
+        posix_delete [label="DELETE:\n- UNLINK\n- RMDIR"];
+        posix_close [label="CLOSE:\n- CLOSE"];
+        posix_rename [label="RENAME:\n- RENAME"];
+        posix_session [label="SESSION_MGMT:\n- MOUNT\n- UMOUNT"];
+        posix_audit [label="AUDIT_MGMT:\n- HEARTBEAT\n- LOST_AUDIT"];
+    }
+
+    // Interactions Layer (Middle)
+    subgraph cluster_logic {
+        label="Interactions Layer";
+        style=dashed;
+
+        aclCheck [label="ACL Check", shape=diamond];
+        metadataMgr [label="Metadata Manager"];
+        pathMapper [label="Path → Object Mapper"];
+        lockMgr [label="Lock Manager"];
+        auditLogger [label="Audit Logger"];
+        router [label="S3 Operation Router"];
+    }
+
+    // S3 Operations (Right)
+    subgraph cluster_s3 {
+        label="S3 Operations";
+        style=dashed;
+
+        s3_put [label="PUT Object"];
+        s3_get [label="GET Object"];
+        s3_delete [label="DELETE Object"];
+        s3_list [label="ListObjectsV2"];
+        s3_copy [label="COPY Object"];
+        s3_head [label="HEAD Object"];
+    }
+
+    // Specific Flows
+    posix_delete -> aclCheck;
+    aclCheck -> lockMgr;
+    lockMgr -> pathMapper;
+    pathMapper -> router;
+    router -> s3_delete;
+
+    posix_read -> aclCheck;
+    aclCheck -> metadataMgr;
+    metadataMgr -> pathMapper;
+    pathMapper -> router;
+    router -> s3_get;
+
+    posix_rename -> aclCheck;
+    aclCheck -> lockMgr;
+    lockMgr -> pathMapper;
+    pathMapper -> router;
+    router -> s3_copy;
+    router -> s3_delete [label="(remove old key)"];
+
+    posix_create_open -> aclCheck;
+    aclCheck -> lockMgr;
+    lockMgr -> pathMapper;
+    pathMapper -> metadataMgr;
+    metadataMgr -> router;
+    router -> s3_put;
+
+    posix_read -> router;
+    router -> s3_list [label="(READDIR)"];
+
+    posix_modify -> aclCheck;
+    aclCheck -> metadataMgr;
+    metadataMgr -> router;
+    router -> s3_put;
+
+    posix_close -> auditLogger;
+    posix_session -> auditLogger;
+    posix_audit -> auditLogger;
+}
